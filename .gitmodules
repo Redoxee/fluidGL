@@ -1,0 +1,3 @@
+[submodule "fluidGL"]
+	path = fluidGL
+	url = https://github.com/Redoxee/fluidGL.git
