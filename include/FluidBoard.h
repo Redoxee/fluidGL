@@ -43,10 +43,14 @@ class FluidBoard: public ofBaseApp{
 		ofShader processShader;
 		ofShader expansionShader;
 		ofShader fluidShader;
+		ofFbo fboFluid;
 
 		unsigned char *liquidGrid;
 		ofImage liquidImage;
-        //ofTexture liquidTex;
+		ofShader decalShader;
+
+		void drawPipeLineNightVale();
+		void drawFluidPipeLine();
 
 };
 #endif // FLUIDBOARD_H

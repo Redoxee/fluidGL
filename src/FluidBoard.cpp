@@ -2,6 +2,7 @@
 #define FLUID_WIDTH ofGetWidth()
 #define FLUID_HEIGHT ofGetHeight()
 #define POS(x,y,c) (y * FLUID_WIDTH + x) * 3 + c
+#define NB_MOD 2
 FluidBoard::FluidBoard()
 {
     liquidGrid = new unsigned char[FLUID_WIDTH * FLUID_HEIGHT * 3];
@@ -13,8 +14,11 @@ FluidBoard::~FluidBoard()
 }
 
 
+bool isNotFirst;
+int DisplayMode;
 //--------------------------------------------------------------
 void FluidBoard::setup(){
+    std::cout << ofGetWidth() << " : " << ofGetHeight() << std::endl;
     for(int x = 0 ; x < FLUID_WIDTH ; ++ x)
     {
         for(int y = 0 ; y < FLUID_HEIGHT ; ++ y)
@@ -25,13 +29,13 @@ void FluidBoard::setup(){
         }
     }
 
-     for(int x = 0 ; x < FLUID_WIDTH ; ++ x)
+     for(int x = 55 ; x < 200 ; ++ x)
     {
-        for(int y = 0 ; y < FLUID_HEIGHT ; ++ y)
+        for(int y = 55 ; y < 200 ; ++ y)
         {
-            liquidGrid[POS(x,y,0)] = 0;
-            liquidGrid[POS(x,y,1)] = y;
-            liquidGrid[POS(x,y,2)] = x;
+            liquidGrid[POS(x,y,0)] = 55;
+            liquidGrid[POS(x,y,1)] = 50;
+            liquidGrid[POS(x,y,2)] = 255;
         }
     }
 
@@ -58,7 +62,12 @@ void FluidBoard::setup(){
     processShader.load("shader/shader.vert","shader/simpleProcesse.frag");
     expansionShader.load("shader/shader.vert","shader/expansion.frag");
     fluidShader.load("shader/shader.vert","shader/simple.frag");
+
+
+    decalShader.load("shader/shader.vert","shader/testDecal.frag");
     setUpFBO();
+    isNotFirst = false;
+    DisplayMode = 0;
 
 }
 
@@ -86,6 +95,11 @@ void FluidBoard::setUpFBO(){
     settings.width = ofGetWidth();
     settings.height = ofGetHeight();
     fbo4.allocate(settings);
+
+    settings = ofFbo::Settings();
+    settings.width = FLUID_WIDTH;
+    settings.height = FLUID_HEIGHT;
+    fboFluid.allocate(settings);
 }
 
 
@@ -93,11 +107,10 @@ void FluidBoard::setUpFBO(){
 void FluidBoard::update(){
 
 }
-
 //--------------------------------------------------------------
-void FluidBoard::draw(){
 
-
+void FluidBoard::drawPipeLineNightVale()
+{
     fbo1.begin();
     nightValeShader.begin();
     nightValeShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
@@ -105,14 +118,6 @@ void FluidBoard::draw(){
     planeScreen.draw();
     nightValeShader.end();
     fbo1.end();
-
-//    simpleShader.begin();
-//    simpleShader.setUniformTexture("texture",liquidImage.getTextureReference(),0);
-//    simpleShader.setUniform2f("iResolution",ofGetWidth()/2.f,ofGetHeight()/2.f);
-//
-//    planeScreen.draw();
-//
-//    simpleShader.end();
 
     fbo2.begin();
     laplacianShader.begin();
@@ -122,7 +127,6 @@ void FluidBoard::draw(){
     planeScreen.draw();
     laplacianShader.end();
     fbo2.end();
-
 
     fbo3.begin();
     expansionShader.begin();
@@ -163,15 +167,82 @@ void FluidBoard::draw(){
     simpleShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
     plane4.draw();
     simpleShader.end();
-
-
 }
+void FluidBoard::drawFluidPipeLine()
+{
+    fboFluid.begin();
+    simpleShader.begin();
+    processShader.setUniformTexture("texture",liquidImage.getTextureReference(),0);
+    simpleShader.setUniform2f("iResolution",FLUID_WIDTH,FLUID_HEIGHT);
+    planeScreen.draw();
+    simpleShader.end();
+    fboFluid.end();
+
+    if(isNotFirst){
+        fbo2.begin();
+        decalShader.begin();
+        decalShader.setUniformTexture("texture",fbo2.getTextureReference(0),0);
+        decalShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
+        decalShader.setUniform1f("timeElapsed",ofGetElapsedTimef());
+        planeScreen.draw();
+        decalShader.end();
+            fbo2.end();
+    }else{
+        isNotFirst = true;
+        fbo2.begin();
+        decalShader.begin();
+        decalShader.setUniformTexture("texture",fboFluid.getTextureReference(0),0);
+        decalShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
+        decalShader.setUniform1f("timeElapsed",ofGetElapsedTimef());
+        planeScreen.draw();
+        decalShader.end();
+        fbo2.end();
+    }
+
+    simpleShader.begin();
+    simpleShader.setUniformTexture("texture",fboFluid.getTextureReference(0),0);
+    simpleShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
+    plane1.draw();
+    simpleShader.end();
+
+    simpleShader.begin();
+    simpleShader.setUniformTexture("texture",fbo2.getTextureReference(0),0);
+    simpleShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
+    plane2.draw();
+    simpleShader.end();
+}
+void FluidBoard::draw(){
+
+   switch (DisplayMode){
+   case 0 :
+    drawFluidPipeLine();
+    break;
+   case 1 :
+    drawPipeLineNightVale();
+    break;
+   }
+}
+
+
 
 //--------------------------------------------------------------
 void FluidBoard::keyPressed(int key){
  if( key == OF_KEY_ESC ){
         simpleShader.unload();
         nightValeShader.unload();
+    }
+    switch (key) {
+    case 'r':
+        isNotFirst = false;
+        break;
+    case OF_KEY_UP :
+        DisplayMode += 1;
+        DisplayMode %= NB_MOD;
+        break;
+    case OF_KEY_DOWN :
+        DisplayMode -= 1;
+        DisplayMode %= NB_MOD;
+        break;
     }
 }
 
