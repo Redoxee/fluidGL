@@ -3,6 +3,7 @@
 #define FLUID_HEIGHT ofGetHeight()
 #define POS(x,y,c) (y * FLUID_WIDTH + x) * 3 + c
 #define NB_MOD 2
+#define NB_SOURCE 2
 FluidBoard::FluidBoard()
 {
     liquidGrid = new unsigned char[FLUID_WIDTH * FLUID_HEIGHT * 3];
@@ -16,6 +17,11 @@ FluidBoard::~FluidBoard()
 
 bool isNotFirst;
 int DisplayMode;
+int DisplayImage;
+float deltaTime;
+float prevTime;
+
+float visc,diff,force,source;
 //--------------------------------------------------------------
 void FluidBoard::setup(){
     std::cout << ofGetWidth() << " : " << ofGetHeight() << std::endl;
@@ -33,8 +39,8 @@ void FluidBoard::setup(){
     {
         for(int y = 55 ; y < 200 ; ++ y)
         {
-            liquidGrid[POS(x,y,0)] = 55;
-            liquidGrid[POS(x,y,1)] = 50;
+            liquidGrid[POS(x,y,0)] = 0;
+            liquidGrid[POS(x,y,1)] = 0;
             liquidGrid[POS(x,y,2)] = 255;
         }
     }
@@ -61,13 +67,26 @@ void FluidBoard::setup(){
     laplacianShader.load("shader/shader.vert","shader/laplacian5.frag");
     processShader.load("shader/shader.vert","shader/simpleProcesse.frag");
     expansionShader.load("shader/shader.vert","shader/expansion.frag");
-    fluidShader.load("shader/shader.vert","shader/simple.frag");
-
 
     decalShader.load("shader/shader.vert","shader/testDecal.frag");
+    fluidShader.load("shader/shader.vert","shader/fluidProcess.frag");
+
+    DiffuseDensityShader.load("shader/shader.vert","shader/diffuseDensity.frag");
+//    AddVecDensityShader.load("shader/shader.vert","shader/addVecDensity.frag");
+
     setUpFBO();
     isNotFirst = false;
     DisplayMode = 0;
+    DisplayImage = 0;
+
+
+    deltaTime = 0.1f;
+    diff = 1.f;
+    visc = 0.0000001f;
+    force = 2.0f;
+    source = 300.0f;
+
+    prevTime = ofGetElapsedTimef();
 
 }
 
@@ -105,6 +124,9 @@ void FluidBoard::setUpFBO(){
 
 //--------------------------------------------------------------
 void FluidBoard::update(){
+    float curTime = ofGetElapsedTimef();
+    deltaTime = curTime - prevTime;
+    prevTime = curTime;
 
 }
 //--------------------------------------------------------------
@@ -168,34 +190,79 @@ void FluidBoard::drawPipeLineNightVale()
     plane4.draw();
     simpleShader.end();
 }
+/*
+void FluidBoard::ComputFluid()
+{
+        fbo2.begin();
+        fluidShader.begin();
+        fluidShader.setUniformTexture("texture",fbo2.getTextureReference(0),0);
+        fluidShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
+        fluidShader.setUniform1f("timeElapsed",ofGetElapsedTimef());
+        fluidShader.setUniform1f("uDeltaTime",deltaTime);
+        fluidShader.setUniform1f("difusionRate",diff);
+        planeScreen.draw();
+        fluidShader.end();
+        fbo2.end();
+}
+*/
+
+void FluidBoard::ComputFluid()
+{
+
+    for(unsigned int k = 0; k < 1 ; ++k)
+    {
+        fbo2.begin();
+        DiffuseDensityShader.begin();
+
+        DiffuseDensityShader.setUniformTexture("texture",fbo2.getTextureReference(0),0);
+        DiffuseDensityShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
+        DiffuseDensityShader.setUniform1f("uDeltaTime",deltaTime);
+        DiffuseDensityShader.setUniform1f("difusionRate",diff);
+
+        planeScreen.draw();
+
+        DiffuseDensityShader.end();
+        fbo2.end();
+    }
+}
+
 void FluidBoard::drawFluidPipeLine()
 {
-    fboFluid.begin();
-    simpleShader.begin();
-    processShader.setUniformTexture("texture",liquidImage.getTextureReference(),0);
-    simpleShader.setUniform2f("iResolution",FLUID_WIDTH,FLUID_HEIGHT);
-    planeScreen.draw();
-    simpleShader.end();
-    fboFluid.end();
+
+    switch (DisplayImage){
+    case 0:
+
+        fboFluid.begin();
+        simpleShader.begin();
+        simpleShader.setUniformTexture("texture",liquidImage.getTextureReference(),0);
+        simpleShader.setUniform2f("iResolution",FLUID_WIDTH,FLUID_HEIGHT);
+        planeScreen.draw();
+        simpleShader.end();
+        fboFluid.end();
+        break;
+    case 1:
+
+        fboFluid.begin();
+        nightValeShader.begin();
+        nightValeShader.setUniformTexture("texture",liquidImage.getTextureReference(),0);
+        nightValeShader.setUniform2f("iResolution",FLUID_WIDTH,FLUID_HEIGHT);
+        planeScreen.draw();
+        nightValeShader.end();
+        fboFluid.end();
+        break;
+    }
 
     if(isNotFirst){
-        fbo2.begin();
-        decalShader.begin();
-        decalShader.setUniformTexture("texture",fbo2.getTextureReference(0),0);
-        decalShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
-        decalShader.setUniform1f("timeElapsed",ofGetElapsedTimef());
-        planeScreen.draw();
-        decalShader.end();
-            fbo2.end();
+        ComputFluid();
     }else{
         isNotFirst = true;
         fbo2.begin();
-        decalShader.begin();
-        decalShader.setUniformTexture("texture",fboFluid.getTextureReference(0),0);
-        decalShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
-        decalShader.setUniform1f("timeElapsed",ofGetElapsedTimef());
+        simpleShader.begin();
+        simpleShader.setUniformTexture("texture",fboFluid.getTextureReference(0),0);
+        simpleShader.setUniform2f("iResolution",ofGetWidth(),ofGetHeight());
+        simpleShader.setUniform1f("timeElapsed",ofGetElapsedTimef());
         planeScreen.draw();
-        decalShader.end();
+        simpleShader.end();
         fbo2.end();
     }
 
@@ -241,7 +308,15 @@ void FluidBoard::keyPressed(int key){
         break;
     case OF_KEY_DOWN :
         DisplayMode -= 1;
-        DisplayMode %= NB_MOD;
+        DisplayMode += DisplayMode < 0 ? NB_MOD:0;
+        break;
+    case OF_KEY_LEFT:
+        DisplayImage -= 1;
+        DisplayImage += DisplayImage < 0 ? NB_SOURCE:0;
+        break;
+    case OF_KEY_RIGHT:
+        DisplayImage += 1;
+        DisplayImage %=NB_SOURCE;
         break;
     }
 }

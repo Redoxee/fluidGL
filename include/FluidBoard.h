@@ -52,5 +52,9 @@ class FluidBoard: public ofBaseApp{
 		void drawPipeLineNightVale();
 		void drawFluidPipeLine();
 
+        void ComputFluid();
+		ofShader DiffuseDensityShader;
+		ofShader AddVecDensityShader;
+
 };
 #endif // FLUIDBOARD_H
